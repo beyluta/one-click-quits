@@ -136,9 +136,16 @@ int main()
                 }
             }
 
-            if (!found && !isWindowMinimized(previous[i]) && getWindowCoordinates(previous[i]).width != getMonitorResolution(previous[i]).width)
+            if (!found)
             {
-                kill(previous[i], SIGTERM);
+                unsigned int PID = previous[i];
+                Vector2D window = getWindowCoordinates(PID);
+                Vector2D monitor = getMonitorResolution(PID);
+
+                if (window.width != monitor.width && window.height != monitor.height && !isWindowMinimized(PID))
+                {
+                    kill(PID, SIGTERM);
+                }
             }
         }
         delete[] previous;
