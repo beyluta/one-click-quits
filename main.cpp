@@ -60,12 +60,10 @@ int main()
                     break;
                 }
             }
-            if (!found)
+            
+            if (!found && !isWindowMinimized(previous[i]))
             {
-                if (!isWindowMinimized(previous[i]))
-                {
-                    kill(previous[i], SIGTERM);
-                }
+                kill(previous[i], SIGTERM);
             }
         }
         delete[] previous;
