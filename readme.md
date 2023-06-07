@@ -1,5 +1,9 @@
-# One Click Quits
-An Open-Source MacOS application that allows you to quit your open applications with a single click.
+<div align=center>
+    <img width="150px" src=assets/logo.png>
+</div>
+<h3 align=center>One Click Quits</h3>
+<p align=center>An Open-Source MacOS application that allows you to quit your open applications with a single click.</p>
+
 
 ## Compatibility list
 | OS          | Compatible          |
