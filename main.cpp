@@ -1,17 +1,12 @@
 #include <iostream>
 #include <CoreGraphics/CoreGraphics.h>
 #include <ApplicationServices/ApplicationServices.h>
+#include "header/hashset.h"
+#include "header/vector2d.h"
 
 const int defaultDelay = 1;
-
-class Vector2D
-{
-public:
-    int width;
-    int height;
-    int x;
-    int y;
-};
+Hashset previous;
+Hashset current;
 
 Vector2D getWindowCoordinates(unsigned int pid)
 {
@@ -79,25 +74,26 @@ Vector2D getMonitorResolution(unsigned int pid)
     return Vector2D();
 }
 
-unsigned int *getActiveWindows()
+Hashset getActiveWindows()
 {
+    Hashset newSet;
     CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenBelowWindow, kCGNullWindowID);
     unsigned int *pids = new unsigned int[CFArrayGetCount(windows)];
     pids[0] = CFArrayGetCount(windows);
 
-    for (CFIndex i = 1; i < CFArrayGetCount(windows); ++i)
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
         CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
         unsigned int pid;
         if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
         {
-            pids[i] = pid;
+            newSet.add(pid);
         }
     }
 
     CFRelease(windows);
-    return pids;
+    return newSet;
 }
 
 bool isWindowMinimized(unsigned int pid)
@@ -119,26 +115,17 @@ bool isWindowMinimized(unsigned int pid)
 
 int main()
 {
-    unsigned int *previous = getActiveWindows();
+    previous = getActiveWindows();
     while (1)
     {
         sleep(defaultDelay);
-        unsigned int *current = getActiveWindows();
-        for (int i = 1; i < previous[0]; ++i)
+        current = getActiveWindows();
+        int *previousArray = previous.toArray();
+        for (int i = 1; i < previousArray[0]; i++)
         {
-            bool found = false;
-            for (int j = 1; j < current[0]; ++j)
+            if (!current.contains(previousArray[i]))
             {
-                if (previous[i] == current[j])
-                {
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                unsigned int PID = previous[i];
+                unsigned int PID = previousArray[i];
                 Vector2D window = getWindowCoordinates(PID);
                 Vector2D monitor = getMonitorResolution(PID);
 
@@ -148,7 +135,7 @@ int main()
                 }
             }
         }
-        delete[] previous;
+        delete[] previousArray;
         previous = current;
     }
 
