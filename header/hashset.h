@@ -1,18 +1,20 @@
+#pragma once
 #include <iostream>
+#include "../header/window.h"
 
 #define MAX_PID 99999
 
 class Hashset
 {
-private: 
-    int *data;
-    int *indices;
+private:
+    Window *data;
+    Window *indices;
     int length = 0;
 
 public:
     Hashset();
     ~Hashset();
-    void add(int value);
-    bool contains(int value);
-    int *toArray();
+    void add(Window value);
+    bool contains(Window value);
+    Window *toArray();
 };

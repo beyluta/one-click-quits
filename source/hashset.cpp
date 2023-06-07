@@ -2,8 +2,8 @@
 
 Hashset::Hashset()
 {
-    Hashset::data = new int[MAX_PID];
-    Hashset::indices = new int[MAX_PID];
+    Hashset::data = new Window[MAX_PID];
+    Hashset::indices = new Window[MAX_PID];
 }
 
 Hashset::~Hashset()
@@ -12,16 +12,16 @@ Hashset::~Hashset()
     delete[] Hashset::indices;
 }
 
-void Hashset::add(int value)
+void Hashset::add(Window value)
 {
-    Hashset::data[value] = value;
+    Hashset::data[value.pid] = value;
     Hashset::indices[Hashset::length] = value;
     Hashset::length++;
 }
 
-bool Hashset::contains(int value)
+bool Hashset::contains(Window value)
 {
-    if (Hashset::data[value] == value)
+    if (Hashset::data[value.pid].pid == value.pid)
     {
         return true;
     }
@@ -29,10 +29,10 @@ bool Hashset::contains(int value)
     return false;
 }
 
-int *Hashset::toArray()
+Window *Hashset::toArray()
 {
-    int *copy = new int[Hashset::length + 1];
-    copy[0] = Hashset::length;
+    Window *copy = new Window[Hashset::length + 1];
+    copy[0].length = Hashset::length;
     for (int i = 1; i < Hashset::length; i++)
     {
         copy[i] = Hashset::indices[i];

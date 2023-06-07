@@ -8,14 +8,14 @@ const int defaultDelay = 1;
 Hashset previous;
 Hashset current;
 
-Vector2D getWindowCoordinates(unsigned int pid)
+Vector2D getWindowCoordinates(pid_t pid)
 {
     CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
     for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
         CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-        unsigned int windowPid;
+        pid_t windowPid;
         if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &windowPid))
         {
             if (windowPid == pid)
@@ -35,7 +35,7 @@ Vector2D getWindowCoordinates(unsigned int pid)
     return Vector2D();
 }
 
-Vector2D getMonitorResolution(unsigned int pid)
+Vector2D getMonitorResolution(pid_t pid)
 {
     CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
 
@@ -77,18 +77,34 @@ Vector2D getMonitorResolution(unsigned int pid)
 Hashset getActiveWindows()
 {
     Hashset newSet;
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenBelowWindow, kCGNullWindowID);
-    unsigned int *pids = new unsigned int[CFArrayGetCount(windows)];
+    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+    pid_t *pids = new pid_t[CFArrayGetCount(windows)];
     pids[0] = CFArrayGetCount(windows);
 
     for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
         CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-        unsigned int pid;
+        pid_t pid;
+
+        CFNumberRef widNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowNumber);
+        pid_t wid;
+        CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
+
+        CGRect bounds;
+        CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
+        CGRectMakeWithDictionaryRepresentation(boundsRef, &bounds);
+
         if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
         {
-            newSet.add(pid);
+            Window window;
+            window.pid = pid;
+            window.wid = wid;
+            window.x = bounds.origin.x;
+            window.y = bounds.origin.y;
+            window.width = bounds.size.width;
+            window.height = bounds.size.height;
+            newSet.add(window);
         }
     }
 
@@ -96,7 +112,7 @@ Hashset getActiveWindows()
     return newSet;
 }
 
-bool isWindowMinimized(unsigned int pid)
+bool isWindowMinimized(pid_t pid)
 {
     AXUIElementRef appRef = AXUIElementCreateApplication(pid);
     CFTypeRef minimizedValue;
@@ -120,22 +136,21 @@ int main()
     {
         sleep(defaultDelay);
         current = getActiveWindows();
-        int *previousArray = previous.toArray();
-        for (int i = 1; i < previousArray[0]; i++)
+        Window *windows = previous.toArray();
+        for (int i = 1; i < windows[0].length; i++)
         {
-            if (!current.contains(previousArray[i]))
+            if (!current.contains(windows[i]))
             {
-                unsigned int PID = previousArray[i];
-                Vector2D window = getWindowCoordinates(PID);
+                pid_t PID = windows[i].pid;
                 Vector2D monitor = getMonitorResolution(PID);
 
-                if (window.width != monitor.width && window.height != monitor.height && !isWindowMinimized(PID))
+                if (windows[i].width != monitor.width && windows[i].height != monitor.height && !isWindowMinimized(PID))
                 {
                     kill(PID, SIGTERM);
                 }
             }
         }
-        delete[] previousArray;
+        delete[] windows;
         previous = current;
     }
 

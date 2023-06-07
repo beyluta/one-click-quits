@@ -1,6 +1,5 @@
-class Vector2D
+struct Vector2D
 {
-public:
     int width;
     int height;
     int x;
