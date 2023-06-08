@@ -52,6 +52,23 @@ bool isWindowValid(Window window)
     return false;
 }
 
+bool isWindowMinimized(Window window)
+{
+    AXUIElementRef appRef = AXUIElementCreateApplication(window.processId);
+    CFTypeRef minimizedValue;
+    bool isMinimized = false;
+
+    if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, &minimizedValue) == kAXErrorSuccess)
+    {
+        CFIndex windowCount = CFArrayGetCount(static_cast<CFArrayRef>(minimizedValue));
+        isMinimized = windowCount > 0;
+        CFRelease(minimizedValue);
+    }
+
+    CFRelease(appRef);
+    return isMinimized;
+}
+
 Hashset getAllWindows()
 {
     Hashset newSet;
@@ -93,6 +110,7 @@ int main()
         {
             if (!isWindowValid(windows[i]) &&
                 !isWindowOnScreen(windows[i]) &&
+                !isWindowMinimized(windows[i]) &&
                 windows[i].processId > 0 &&
                 windows[i].windowId > 0)
             {
