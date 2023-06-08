@@ -72,7 +72,7 @@ bool isWindowMinimized(Window window)
 Hashset getAllWindows()
 {
     Hashset newSet;
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
     pid_t *pids = new pid_t[CFArrayGetCount(windows)];
     pids[0] = CFArrayGetCount(windows);
 
