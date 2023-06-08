@@ -8,33 +8,6 @@ const int defaultDelay = 1;
 Hashset previous;
 Hashset current;
 
-Vector2D getWindowCoordinates(pid_t pid)
-{
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
-    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
-    {
-        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
-        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-        pid_t windowPid;
-        if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &windowPid))
-        {
-            if (windowPid == pid)
-            {
-                Vector2D vector;
-                CGRect bounds;
-                CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
-                CGRectMakeWithDictionaryRepresentation(boundsRef, &bounds);
-                vector.width = bounds.size.width;
-                vector.height = bounds.size.height;
-                vector.x = bounds.origin.x;
-                vector.y = bounds.origin.y;
-                return vector;
-            }
-        }
-    }
-    return Vector2D();
-}
-
 Vector2D getMonitorResolution(pid_t pid)
 {
     CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
@@ -137,7 +110,7 @@ int main()
         sleep(defaultDelay);
         current = getActiveWindows();
         Window *windows = previous.toArray();
-        for (int i = 1; i < windows[0].length; i++)
+        for (int i = 0; i < windows[0].length; i++)
         {
             if (!current.contains(windows[i]))
             {

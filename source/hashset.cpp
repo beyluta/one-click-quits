@@ -31,11 +31,11 @@ bool Hashset::contains(Window value)
 
 Window *Hashset::toArray()
 {
-    Window *copy = new Window[Hashset::length + 1];
-    copy[0].length = Hashset::length;
-    for (int i = 1; i < Hashset::length; i++)
+    Window *copy = new Window[Hashset::length];
+    for (int i = 0; i < Hashset::length; i++)
     {
         copy[i] = Hashset::indices[i];
+        copy[i].length = Hashset::length;
     }
     return copy;
 }
