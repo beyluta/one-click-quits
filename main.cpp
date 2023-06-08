@@ -1,110 +1,66 @@
 #include <iostream>
-#include <CoreGraphics/CoreGraphics.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include "header/hashset.h"
-#include "header/vector2d.h"
 
-const int defaultDelay = 1;
-Hashset previous;
-Hashset current;
+const int m_delay = 1;
+Hashset m_windows;
 
-Vector2D getWindowCoordinates(unsigned int pid)
+bool isWindowOnScreen(const Window window)
 {
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
     for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
     {
-        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
-        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-        unsigned int windowPid;
-        if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &windowPid))
+        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
+        const CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        pid_t pid;
+        CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
+
+        if (pid == window.processId)
         {
-            if (windowPid == pid)
-            {
-                Vector2D vector;
-                CGRect bounds;
-                CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
-                CGRectMakeWithDictionaryRepresentation(boundsRef, &bounds);
-                vector.width = bounds.size.width;
-                vector.height = bounds.size.height;
-                vector.x = bounds.origin.x;
-                vector.y = bounds.origin.y;
-                return vector;
-            }
-        }
-    }
-    return Vector2D();
-}
-
-Vector2D getMonitorResolution(unsigned int pid)
-{
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
-
-    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
-    {
-        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
-        CFNumberRef ownerPIDRef = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-
-        pid_t ownerPID;
-        if (CFNumberGetValue(ownerPIDRef, kCFNumberSInt32Type, &ownerPID) && ownerPID == pid)
-        {
-            CGRect windowBounds;
-            CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
-            CGRectMakeWithDictionaryRepresentation(boundsRef, &windowBounds);
-
-            int monitorNumber = 0;
-            CGDirectDisplayID displayIDs[10];
-            uint32_t displayCount;
-            CGGetDisplaysWithPoint(windowBounds.origin, 10, displayIDs, &displayCount);
-
-            for (uint32_t j = 0; j < displayCount; j++)
-            {
-                if (CGDisplayIsActive(displayIDs[j]))
-                {
-                    CGRect displayBounds = CGDisplayBounds(displayIDs[j]);
-                    Vector2D vector;
-                    vector.width = displayBounds.size.width;
-                    vector.height = displayBounds.size.height;
-                    return vector;
-                }
-            }
+            CFRelease(windows);
+            return true;
         }
     }
 
     CFRelease(windows);
-    return Vector2D();
+    return false;
 }
 
-Hashset getActiveWindows()
+bool isWindowValid(const Window window)
 {
-    Hashset newSet;
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenBelowWindow, kCGNullWindowID);
-    unsigned int *pids = new unsigned int[CFArrayGetCount(windows)];
-    pids[0] = CFArrayGetCount(windows);
-
-    for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
+    const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
     {
-        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
-        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-        unsigned int pid;
-        if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
+        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
+        const CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        pid_t pid;
+        CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
+        const CFNumberRef widNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowNumber);
+        pid_t wid;
+        CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
+
+        if (pid == window.processId && wid == window.windowId)
         {
-            newSet.add(pid);
+            CFRelease(windows);
+            return true;
         }
     }
 
     CFRelease(windows);
-    return newSet;
+    return false;
 }
 
-bool isWindowMinimized(unsigned int pid)
+bool isWindowMinimized(const Window window)
 {
-    AXUIElementRef appRef = AXUIElementCreateApplication(pid);
+    const AXUIElementRef appRef = AXUIElementCreateApplication(window.processId);
     CFTypeRef minimizedValue;
     bool isMinimized = false;
 
     if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, &minimizedValue) == kAXErrorSuccess)
     {
-        CFIndex windowCount = CFArrayGetCount(static_cast<CFArrayRef>(minimizedValue));
+        const CFIndex windowCount = CFArrayGetCount(static_cast<CFArrayRef>(minimizedValue));
         isMinimized = windowCount > 0;
         CFRelease(minimizedValue);
     }
@@ -113,30 +69,77 @@ bool isWindowMinimized(unsigned int pid)
     return isMinimized;
 }
 
-int main()
+Hashset getAllWindows()
 {
-    previous = getActiveWindows();
-    while (1)
+    Hashset set;
+    const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+    
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
-        sleep(defaultDelay);
-        current = getActiveWindows();
-        int *previousArray = previous.toArray();
-        for (int i = 1; i < previousArray[0]; i++)
-        {
-            if (!current.contains(previousArray[i]))
-            {
-                unsigned int PID = previousArray[i];
-                Vector2D window = getWindowCoordinates(PID);
-                Vector2D monitor = getMonitorResolution(PID);
+        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
+        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        pid_t pid;
 
-                if (window.width != monitor.width && window.height != monitor.height && !isWindowMinimized(PID))
+        CFNumberRef widNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowNumber);
+        pid_t wid;
+        CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
+
+        if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
+        {
+            Window window;
+            window.processId = pid;
+            window.windowId = wid;
+            set.add(window);
+        }
+    }
+
+    CFRelease(windows);
+    return set;
+}
+
+bool isBackgroundWindow(const Window window)
+{
+    ProcessSerialNumber psn = {0, kNoProcess};
+    while (GetNextProcess(&psn) == noErr)
+    {
+        pid_t processPID;
+        if (GetProcessPID(&psn, &processPID) == noErr && processPID == window.processId)
+        {
+            ProcessInfoRec processInfo;
+            memset(&processInfo, 0, sizeof(ProcessInfoRec));
+            processInfo.processInfoLength = sizeof(ProcessInfoRec);
+            if (GetProcessInformation(&psn, &processInfo) == noErr)
+            {
+                if (processInfo.processMode & modeOnlyBackground)
                 {
-                    kill(PID, SIGTERM);
+                    return true;
                 }
             }
         }
-        delete[] previousArray;
-        previous = current;
+    }
+    return false;
+}
+
+int main()
+{
+    while (1)
+    {
+        m_windows = getAllWindows();
+        sleep(m_delay);
+        const Window *windows = m_windows.toArray();
+        for (int i = 0; i < windows[0].length - 1; i++)
+        {
+            if (!isWindowValid(windows[i]) &&
+                !isWindowOnScreen(windows[i]) &&
+                !isWindowMinimized(windows[i]) &&
+                !isBackgroundWindow(windows[i]) &&
+                windows[i].processId > 0 &&
+                windows[i].windowId > 0)
+            {
+                kill(windows[i].processId, SIGTERM);
+            }
+        }
+        delete[] windows;
     }
 
     return 0;
