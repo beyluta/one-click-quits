@@ -73,9 +73,7 @@ Hashset getAllWindows()
 {
     Hashset set;
     const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
-    pid_t *pids = new pid_t[CFArrayGetCount(windows)];
-    pids[0] = CFArrayGetCount(windows);
-
+    
     for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
@@ -95,7 +93,6 @@ Hashset getAllWindows()
         }
     }
 
-    delete[] pids;
     CFRelease(windows);
     return set;
 }
