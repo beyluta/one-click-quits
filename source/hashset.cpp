@@ -14,14 +14,14 @@ Hashset::~Hashset()
 
 void Hashset::add(Window value)
 {
-    Hashset::data[value.pid] = value;
+    Hashset::data[value.processId] = value;
     Hashset::indices[Hashset::length] = value;
     Hashset::length++;
 }
 
 bool Hashset::contains(Window value)
 {
-    if (Hashset::data[value.pid].pid == value.pid)
+    if (Hashset::data[value.processId].processId == value.processId)
     {
         return true;
     }

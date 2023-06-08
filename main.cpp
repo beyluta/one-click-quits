@@ -1,56 +1,61 @@
 #include <iostream>
-#include <CoreGraphics/CoreGraphics.h>
+#include <unistd.h>
+#include <sys/sysctl.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include "header/hashset.h"
-#include "header/vector2d.h"
 
-const int defaultDelay = 1;
-Hashset previous;
-Hashset current;
+const int m_delay = 1;
+Hashset m_windows;
 
-Vector2D getMonitorResolution(pid_t pid)
+bool isWindowOnScreen(Window window)
 {
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
-
-    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
+    CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+    for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++)
     {
-        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
-        CFNumberRef ownerPIDRef = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        pid_t pid;
+        CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
 
-        pid_t ownerPID;
-        if (CFNumberGetValue(ownerPIDRef, kCFNumberSInt32Type, &ownerPID) && ownerPID == pid)
+        if (pid == window.processId)
         {
-            CGRect windowBounds;
-            CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
-            CGRectMakeWithDictionaryRepresentation(boundsRef, &windowBounds);
-
-            int monitorNumber = 0;
-            CGDirectDisplayID displayIDs[10];
-            uint32_t displayCount;
-            CGGetDisplaysWithPoint(windowBounds.origin, 10, displayIDs, &displayCount);
-
-            for (uint32_t j = 0; j < displayCount; j++)
-            {
-                if (CGDisplayIsActive(displayIDs[j]))
-                {
-                    CGRect displayBounds = CGDisplayBounds(displayIDs[j]);
-                    Vector2D vector;
-                    vector.width = displayBounds.size.width;
-                    vector.height = displayBounds.size.height;
-                    return vector;
-                }
-            }
+            CFRelease(windowList);
+            return true;
         }
     }
 
-    CFRelease(windows);
-    return Vector2D();
+    CFRelease(windowList);
+    return false;
 }
 
-Hashset getActiveWindows()
+bool isWindowValid(Window window)
+{
+    CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++)
+    {
+        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+        CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+        pid_t pid;
+        CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
+        CFNumberRef widNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowNumber);
+        pid_t wid;
+        CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
+
+        if (pid == window.processId && wid == window.windowId)
+        {
+            CFRelease(windowList);
+            return true;
+        }
+    }
+
+    CFRelease(windowList);
+    return false;
+}
+
+Hashset getAllWindows()
 {
     Hashset newSet;
-    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
     pid_t *pids = new pid_t[CFArrayGetCount(windows)];
     pids[0] = CFArrayGetCount(windows);
 
@@ -64,19 +69,11 @@ Hashset getActiveWindows()
         pid_t wid;
         CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
 
-        CGRect bounds;
-        CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
-        CGRectMakeWithDictionaryRepresentation(boundsRef, &bounds);
-
         if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
         {
             Window window;
-            window.pid = pid;
-            window.wid = wid;
-            window.x = bounds.origin.x;
-            window.y = bounds.origin.y;
-            window.width = bounds.size.width;
-            window.height = bounds.size.height;
+            window.processId = pid;
+            window.windowId = wid;
             newSet.add(window);
         }
     }
@@ -85,46 +82,24 @@ Hashset getActiveWindows()
     return newSet;
 }
 
-bool isWindowMinimized(pid_t pid)
-{
-    AXUIElementRef appRef = AXUIElementCreateApplication(pid);
-    CFTypeRef minimizedValue;
-    bool isMinimized = false;
-
-    if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, &minimizedValue) == kAXErrorSuccess)
-    {
-        CFIndex windowCount = CFArrayGetCount(static_cast<CFArrayRef>(minimizedValue));
-        isMinimized = windowCount > 0;
-        CFRelease(minimizedValue);
-    }
-
-    CFRelease(appRef);
-    return isMinimized;
-}
-
 int main()
 {
-    previous = getActiveWindows();
     while (1)
     {
-        sleep(defaultDelay);
-        current = getActiveWindows();
-        Window *windows = previous.toArray();
-        for (int i = 0; i < windows[0].length; i++)
+        m_windows = getAllWindows();
+        sleep(m_delay);
+        Window *windows = m_windows.toArray();
+        for (int i = 0; i < windows[0].length - 1; i++)
         {
-            if (!current.contains(windows[i]))
+            if (!isWindowValid(windows[i]) &&
+                !isWindowOnScreen(windows[i]) &&
+                windows[i].processId > 0 &&
+                windows[i].windowId > 0)
             {
-                pid_t PID = windows[i].pid;
-                Vector2D monitor = getMonitorResolution(PID);
-
-                if (windows[i].width != monitor.width && windows[i].height != monitor.height && !isWindowMinimized(PID))
-                {
-                    kill(PID, SIGTERM);
-                }
+                kill(windows[i].processId, SIGTERM);
             }
         }
         delete[] windows;
-        previous = current;
     }
 
     return 0;

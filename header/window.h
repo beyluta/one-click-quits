@@ -1,10 +1,9 @@
+#pragma once
+#include <CoreGraphics/CoreGraphics.h>
+
 struct Window
 {
-    int pid;
-    int wid;
-    int x;
-    int y;
-    int width;
-    int height;
+    pid_t processId;
+    CGWindowID windowId;
     int length;
 };
