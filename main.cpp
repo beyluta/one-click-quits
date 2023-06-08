@@ -99,6 +99,29 @@ Hashset getAllWindows()
     return newSet;
 }
 
+bool isBackgroundWindow(Window window)
+{
+    ProcessSerialNumber psn = {0, kNoProcess};
+    while (GetNextProcess(&psn) == noErr)
+    {
+        pid_t processPID;
+        if (GetProcessPID(&psn, &processPID) == noErr && processPID == window.processId)
+        {
+            ProcessInfoRec processInfo;
+            memset(&processInfo, 0, sizeof(ProcessInfoRec));
+            processInfo.processInfoLength = sizeof(ProcessInfoRec);
+            if (GetProcessInformation(&psn, &processInfo) == noErr)
+            {
+                if (processInfo.processMode & modeOnlyBackground)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 int main()
 {
     while (1)
@@ -111,6 +134,7 @@ int main()
             if (!isWindowValid(windows[i]) &&
                 !isWindowOnScreen(windows[i]) &&
                 !isWindowMinimized(windows[i]) &&
+                !isBackgroundWindow(windows[i]) &&
                 windows[i].processId > 0 &&
                 windows[i].windowId > 0)
             {
