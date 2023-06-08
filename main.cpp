@@ -71,7 +71,7 @@ bool isWindowMinimized(const Window window)
 
 Hashset getAllWindows()
 {
-    Hashset newSet;
+    Hashset set;
     const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
     pid_t *pids = new pid_t[CFArrayGetCount(windows)];
     pids[0] = CFArrayGetCount(windows);
@@ -91,12 +91,13 @@ Hashset getAllWindows()
             Window window;
             window.processId = pid;
             window.windowId = wid;
-            newSet.add(window);
+            set.add(window);
         }
     }
 
+    delete[] pids;
     CFRelease(windows);
-    return newSet;
+    return set;
 }
 
 bool isBackgroundWindow(const Window window)
