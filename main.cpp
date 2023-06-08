@@ -9,31 +9,31 @@ Hashset m_windows;
 
 bool isWindowOnScreen(const Window window)
 {
-    const CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
-    for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++)
+    const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
     {
-        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
         const CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
         pid_t pid;
         CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
 
         if (pid == window.processId)
         {
-            CFRelease(windowList);
+            CFRelease(windows);
             return true;
         }
     }
 
-    CFRelease(windowList);
+    CFRelease(windows);
     return false;
 }
 
 bool isWindowValid(const Window window)
 {
-    CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
-    for (CFIndex i = 0; i < CFArrayGetCount(windowList); i++)
+    const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
     {
-        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+        const CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
         const CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
         pid_t pid;
         CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid);
@@ -43,12 +43,12 @@ bool isWindowValid(const Window window)
 
         if (pid == window.processId && wid == window.windowId)
         {
-            CFRelease(windowList);
+            CFRelease(windows);
             return true;
         }
     }
 
-    CFRelease(windowList);
+    CFRelease(windows);
     return false;
 }
 
