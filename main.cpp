@@ -101,6 +101,8 @@ void updateDisplayBounds(Window &window)
             }
         }
     }
+
+    CFRelease(windows);
 }
 
 Hashset getAllWindows()
