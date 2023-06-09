@@ -176,7 +176,7 @@ int main()
                 !isWindowOnScreen(windows[i]) &&
                 !isWindowMinimized(windows[i]) &&
                 !isBackgroundWindow(windows[i]) &&
-                (windows[i].window.width < windows[i].display.width && windows[i].window.height < windows[i].display.height) &&
+                (windows[i].window.width != windows[i].display.width && windows[i].window.height != windows[i].display.height) &&
                 windows[i].processId > 0 &&
                 windows[i].windowId > 0)
             {
