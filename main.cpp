@@ -69,11 +69,45 @@ bool isWindowMinimized(const Window window)
     return isMinimized;
 }
 
+void updateDisplayBounds(Window &window)
+{
+    CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID);
+
+    for (CFIndex i = 0; i < CFArrayGetCount(windows); i++)
+    {
+        CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
+        CFNumberRef ownerPIDRef = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+
+        pid_t ownerPID;
+        if (CFNumberGetValue(ownerPIDRef, kCFNumberSInt32Type, &ownerPID) && ownerPID == window.processId)
+        {
+            CGRect windowBounds;
+            CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
+            CGRectMakeWithDictionaryRepresentation(boundsRef, &windowBounds);
+
+            int monitorNumber = 0;
+            CGDirectDisplayID displayIDs[10];
+            uint32_t displayCount;
+            CGGetDisplaysWithPoint(windowBounds.origin, 10, displayIDs, &displayCount);
+
+            for (uint32_t j = 0; j < displayCount; j++)
+            {
+                if (CGDisplayIsActive(displayIDs[j]))
+                {
+                    CGRect displayBounds = CGDisplayBounds(displayIDs[j]);
+                    window.display.width = displayBounds.size.width;
+                    window.display.height = displayBounds.size.height;
+                }
+            }
+        }
+    }
+}
+
 Hashset getAllWindows()
 {
     Hashset set;
     const CFArrayRef windows = CGWindowListCopyWindowInfo(kCGWindowListOptionAll | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
-    
+
     for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
@@ -84,11 +118,18 @@ Hashset getAllWindows()
         pid_t wid;
         CFNumberGetValue(widNumber, kCFNumberSInt32Type, &wid);
 
+        CGRect bounds;
+        CFDictionaryRef boundsRef = (CFDictionaryRef)CFDictionaryGetValue(windowInfo, kCGWindowBounds);
+        CGRectMakeWithDictionaryRepresentation(boundsRef, &bounds);
+
         if (CFNumberGetValue(pidNumber, kCFNumberSInt32Type, &pid))
         {
             Window window;
             window.processId = pid;
             window.windowId = wid;
+            window.window.width = bounds.size.width;
+            window.window.height = bounds.size.height;
+            updateDisplayBounds(window);
             set.add(window);
         }
     }
@@ -133,6 +174,7 @@ int main()
                 !isWindowOnScreen(windows[i]) &&
                 !isWindowMinimized(windows[i]) &&
                 !isBackgroundWindow(windows[i]) &&
+                (windows[i].window.width < windows[i].display.width && windows[i].window.height < windows[i].display.height) &&
                 windows[i].processId > 0 &&
                 windows[i].windowId > 0)
             {
