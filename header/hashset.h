@@ -16,5 +16,6 @@ public:
     ~Hashset();
     void add(Window value);
     bool contains(Window value);
+    Window getWindowByPID(pid_t processId);
     Window *toArray();
 };

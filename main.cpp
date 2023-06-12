@@ -2,9 +2,9 @@
 #include <unistd.h>
 #include <sys/sysctl.h>
 #include <ApplicationServices/ApplicationServices.h>
+#include <CoreGraphics/CoreGraphics.h>
 #include "header/hashset.h"
 
-const int m_delay = 1;
 Hashset m_windows;
 
 bool isWindowOnScreen(const Window window)
@@ -163,28 +163,66 @@ bool isBackgroundWindow(const Window window)
     return false;
 }
 
+void onWindowClose(AXObserverRef observer, AXUIElementRef element, CFStringRef notification, void *context)
+{
+    pid_t pid;
+    AXUIElementGetPid(element, &pid);
+    kill(pid, SIGTERM);
+}
+
 int main()
 {
-    while (1)
+    m_windows = getAllWindows();
+    const Window *windowArray = m_windows.toArray();
+    for (int i = 0; i < windowArray[0].length; i++)
     {
-        m_windows = getAllWindows();
-        sleep(m_delay);
-        const Window *windows = m_windows.toArray();
-        for (int i = 0; i < windows[0].length - 1; i++)
-        {
-            if (!isWindowValid(windows[i]) &&
-                !isWindowOnScreen(windows[i]) &&
-                !isWindowMinimized(windows[i]) &&
-                !isBackgroundWindow(windows[i]) &&
-                (windows[i].window.width != windows[i].display.width && windows[i].window.height != windows[i].display.height) &&
-                windows[i].processId > 0 &&
-                windows[i].windowId > 0)
-            {
-                kill(windows[i].processId, SIGTERM);
-            }
-        }
-        delete[] windows;
+        AXUIElementRef program = AXUIElementCreateApplication(windowArray[i].processId);
+        AXObserverRef observer;
+        AXObserverCreate(windowArray[i].processId, onWindowClose, &observer);
+        CFStringRef notification = kAXUIElementDestroyedNotification;
+        AXObserverAddNotification(observer, program, notification, NULL);
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), kCFRunLoopDefaultMode);
     }
+    delete[] windowArray;
+    CFRunLoopRun();
 
-    return 0;
+    // m_windows = getAllWindows();
+    // const Window *windows = m_windows.toArray();
+    // for (int i = 0; i < windows[0].length - 1; i++)
+    // {
+    //     AXUIElementRef program = AXUIElementCreateApplication(windows[i].processId);
+    //     AXObserverRef observer;
+    //     AXObserverCreate(windows[i].processId, onWindowClose, &observer);
+    //     CFStringRef notification = kAXUIElementDestroyedNotification;
+    //     AXObserverAddNotification(observer, program, notification, NULL);
+    //     CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), kCFRunLoopDefaultMode);
+    //     CFRunLoopRun();
+    // }
+    // return 0;
 }
+
+// #include <iostream>
+// #include <ApplicationServices/ApplicationServices.h>
+
+// void WindowCloseCallback(AXObserverRef observer, AXUIElementRef element, CFStringRef notification, void* context) {
+//     std::cout << "A window was closed!" << std::endl;
+// }
+
+// int main() {
+//     // Create an application reference for Safari
+//     AXUIElementRef safariApp = AXUIElementCreateApplication(8115); // Process ID of Safari
+
+//     // Create an observer for window close events
+//     AXObserverRef observer;
+//     AXObserverCreate(8115, WindowCloseCallback, &observer);
+
+//     // Specify the event to observe
+//     CFStringRef notification = kAXUIElementDestroyedNotification;
+//     AXObserverAddNotification(observer, safariApp, notification, NULL);
+
+//     // Run the main event loop
+//     CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), kCFRunLoopDefaultMode);
+//     CFRunLoopRun();
+
+//     return 0;
+// }

@@ -29,6 +29,11 @@ bool Hashset::contains(Window value)
     return false;
 }
 
+Window Hashset::getWindowByPID(pid_t processId)
+{
+    return Hashset::data[processId];
+}
+
 Window *Hashset::toArray()
 {
     Window *copy = new Window[Hashset::length];
