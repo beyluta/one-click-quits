@@ -7,6 +7,7 @@
 
 struct ProcInfo
 {
+    char name[256];
     pid_t pid;
     pid_t wid;
 };
@@ -19,6 +20,9 @@ struct ProcInfo *getProcs()
     for (CFIndex i = 0; i < CFArrayGetCount(windows); ++i)
     {
         CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windows, i);
+        CFStringRef nameRef = (CFStringRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerName);
+        CFStringGetCString(nameRef, procs[i].name, 256, kCFStringEncodingUTF8);
+
         CFNumberRef pidNumber = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
         pid_t pid;
 
@@ -41,10 +45,27 @@ struct ProcInfo *getProcs()
     return procs;
 }
 
+int getProcInstanceCount(struct ProcInfo proc)
+{
+    int windowCount = 0;
+    AXUIElementRef appRef = AXUIElementCreateApplication(proc.pid);
+    CFArrayRef windowList;
+    AXError result = AXUIElementCopyAttributeValues(appRef, kAXWindowsAttribute, 0, 9999, &windowList);
+
+    if (result == kAXErrorSuccess)
+    {
+        windowCount = CFArrayGetCount(windowList);
+        CFRelease(windowList);
+    }
+
+    CFRelease(appRef);
+    return windowCount;
+}
+
 int main(int argc, const char *argv[])
 {
     struct ProcInfo *o_proc_table = getProcs();
-    const int maxTimerCount = 5;
+    const int maxTimerCount = 2;
     int timerCount = 0;
 
     while (1)
@@ -63,16 +84,19 @@ int main(int argc, const char *argv[])
 
                 for (int j = 0; j < MAX_PROC_COUNT; j++)
                 {
-                    if (c_proc_table[j].pid == o_proc_table[i].pid && c_proc_table[j].wid == o_proc_table[i].wid)
+                    if (
+                        c_proc_table[j].pid == o_proc_table[i].pid &&
+                        c_proc_table[j].wid == o_proc_table[i].wid &&
+                        strcmp(c_proc_table[j].name, o_proc_table[i].name) == 0)
                     {
                         isProcessAlive = true;
                         break;
                     }
                 }
 
-                if (!isProcessAlive)
+                if (!isProcessAlive && getProcInstanceCount(o_proc_table[i]) <= 0)
                 {
-                    printf("Process %d is dead\n", o_proc_table[i].pid);
+                    kill(o_proc_table[i].pid, SIGTERM);
                 }
             }
 
@@ -82,7 +106,6 @@ int main(int argc, const char *argv[])
             continue;
         }
 
-        printf("%d\n", timerCount);
         timerCount++;
         sleep(1);
     }
