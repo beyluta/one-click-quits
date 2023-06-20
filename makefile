@@ -1,2 +1,7 @@
 all:
-	g++ -w -std=c++11 -framework CoreGraphics -framework ApplicationServices -o OneClickQuits source/hashset.cpp main.cpp
+	gcc -w -framework CoreGraphics -framework ApplicationServices -o OneClickQuits main.c
+
+run:
+	clear
+	gcc -w -framework CoreGraphics -framework ApplicationServices -o OneClickQuits main.c
+	./OneClickQuits
